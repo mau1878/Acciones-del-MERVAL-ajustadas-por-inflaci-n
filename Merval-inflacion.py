@@ -18,7 +18,7 @@ def convert_monthly_to_daily(cpi_data):
         end_date = cpi_data['Date'].iloc[i + 1]
         inflation_rate = cpi_data['CPI_MOM'].iloc[i] / 100.0  # Convert to decimal
         
-        # Adjust date_range without 'closed' parameter
+        # Create a date range for the month
         date_range = pd.date_range(start_date, end_date - pd.Timedelta(days=1), freq='D')
         daily_cpi.extend([(date, inflation_rate) for date in date_range])
     
@@ -28,12 +28,15 @@ def convert_monthly_to_daily(cpi_data):
     daily_cpi.extend([(date, last_inflation_rate) for date in pd.date_range(last_date, dt.datetime.today())])
     
     daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
+    daily_cpi_df['Date'] = pd.to_datetime(daily_cpi_df['Date'])
+    daily_cpi_df.set_index('Date', inplace=True)
     return daily_cpi_df
 
 # Adjust historical prices based on daily CPI
 def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     # Merge daily CPI into the stock data
-    prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
+    prices_df.set_index('Date', inplace=True)
+    prices_df = prices_df.join(daily_cpi_df, how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
     
     # Calculate cumulative product of daily inflation rates
@@ -42,6 +45,8 @@ def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     # Adjust prices based on cumulative inflation
     prices_df['Adjusted_Price'] = prices_df['Price'] * prices_df['Cumulative_Inflation'].iloc[-1] / prices_df['Cumulative_Inflation']
     
+    # Reset index to return Date as a column
+    prices_df.reset_index(inplace=True)
     return prices_df
 
 # Fetch historical stock prices
