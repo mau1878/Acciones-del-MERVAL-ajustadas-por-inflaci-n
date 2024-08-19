@@ -82,12 +82,13 @@ if st.button('Obtener Datos y Graficar'):
             data = data.to_frame()
             data.columns = [main_stock]
 
+        # Forward fill missing values
+        data.ffill(inplace=True)
+
         # Ensure the DataFrame has all necessary columns
         if main_stock not in data.columns:
             st.error(f"No se encontró el ticker principal '{main_stock}' en los datos.")
         else:
-            data.ffill(inplace=True)
-
             # Adjust prices for inflation
             inflation_adjusted_data = data.mul(daily_cpi['InflationFactor'], axis=0)
 
