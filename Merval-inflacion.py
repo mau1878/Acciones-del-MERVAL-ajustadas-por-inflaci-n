@@ -74,7 +74,7 @@ def main(ticker, start_date, end_date, cpi_csv_path):
 # Streamlit UI
 st.title("Stock Price Adjustment for Inflation")
 
-ticker = st.text_input("Enter stock ticker:", 'YPF.BA')
+ticker = st.text_input("Enter stock ticker:", 'YPFD.BA')
 start_date = st.date_input("Start date:", dt.datetime(2023, 1, 1))
 end_date = st.date_input("End date:", dt.datetime.today())
 
