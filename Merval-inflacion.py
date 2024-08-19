@@ -86,7 +86,7 @@ if st.button('Obtener Datos y Graficar'):
         if main_stock not in data.columns:
             st.error(f"No se encontró el ticker principal '{main_stock}' en los datos.")
         else:
-            data.fillna(method='ffill', inplace=True)
+            data.ffill(inplace=True)
 
             # Adjust prices for inflation
             inflation_adjusted_data = data.mul(daily_cpi['InflationFactor'], axis=0)
