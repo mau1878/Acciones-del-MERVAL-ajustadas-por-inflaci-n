@@ -18,7 +18,7 @@ def convert_monthly_to_daily(cpi_data):
         end_date = cpi_data['Date'].iloc[i + 1]
         inflation_rate = cpi_data['CPI_MOM'].iloc[i] / 100.0  # Convert to decimal
         
-        # Generate daily dates and apply inflation rate
+        # Adjust date_range without 'closed' parameter
         date_range = pd.date_range(start_date, end_date - pd.Timedelta(days=1), freq='D')
         daily_cpi.extend([(date, inflation_rate) for date in date_range])
     
@@ -30,21 +30,22 @@ def convert_monthly_to_daily(cpi_data):
     daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
     return daily_cpi_df
 
-# Adjust historical prices based on daily CPI
+# Adjust historical prices based on cumulative inflation calculated backwards
 def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     # Merge daily CPI into the stock data
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
+
+    # Sort by date to calculate cumulative inflation backwards
+    prices_df = prices_df.sort_values('Date')
     
-    # Calculate cumulative product of daily inflation rates
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].apply(lambda x: x + 1)  # Convert inflation rates to growth factors
-    prices_df['Cumulative_Inflation'] = (prices_df['Daily_CPI'].cumprod())  # Calculate cumulative inflation
-    
-    # Find the cumulative inflation factor for the most recent date
-    latest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[-1]
+    # Calculate cumulative inflation backwards
+    prices_df['Cumulative_Inflation'] = 1.0
+    for i in range(len(prices_df) - 2, -1, -1):
+        prices_df['Cumulative_Inflation'].iloc[i] = prices_df['Cumulative_Inflation'].iloc[i + 1] * (1 + prices_df['Daily_CPI'].iloc[i])
     
     # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Price'] * (latest_cumulative_inflation / prices_df['Cumulative_Inflation'])
+    prices_df['Adjusted_Price'] = prices_df['Price'] * prices_df['Cumulative_Inflation'].iloc[-1] / prices_df['Cumulative_Inflation']
     
     return prices_df
 
