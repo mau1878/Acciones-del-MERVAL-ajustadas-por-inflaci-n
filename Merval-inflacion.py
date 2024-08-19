@@ -4,7 +4,7 @@ import numpy as np
 import datetime as dt
 
 # Load the CPI data
-cpi_data = pd.read_csv('path/to/cpi_mom_data.csv', parse_dates=['Date'])
+cpi_data = pd.read_csv('cpi_mom_data.csv', parse_dates=['Date'])
 cpi_data = cpi_data.sort_values('Date')
 
 # Convert monthly CPI to daily CPI
