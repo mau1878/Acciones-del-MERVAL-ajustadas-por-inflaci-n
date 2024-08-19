@@ -38,11 +38,13 @@ def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     
     # Calculate cumulative product of daily inflation rates
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].apply(lambda x: x + 1)  # Convert inflation rates to growth factors
-    prices_df['Cumulative_Inflation'] = (prices_df['Daily_CPI'].cumprod() - 1)  # Calculate cumulative inflation
+    prices_df['Cumulative_Inflation'] = (prices_df['Daily_CPI'].cumprod())  # Calculate cumulative inflation
+    
+    # Find the cumulative inflation factor for the most recent date
+    latest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[-1]
     
     # Adjust prices based on cumulative inflation
-    initial_inflation = prices_df['Cumulative_Inflation'].iloc[0]
-    prices_df['Adjusted_Price'] = prices_df['Price'] / (1 + prices_df['Cumulative_Inflation'] - initial_inflation)
+    prices_df['Adjusted_Price'] = prices_df['Price'] * (latest_cumulative_inflation / prices_df['Cumulative_Inflation'])
     
     return prices_df
 
