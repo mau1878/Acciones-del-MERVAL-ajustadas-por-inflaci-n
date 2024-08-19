@@ -77,10 +77,10 @@ if st.button('Obtener Datos y Graficar'):
         # Fetch stock data
         data = yf.download([main_stock] + extra_stocks, start=start_date, end=end_date)['Adj Close']
 
-        # Check if data is a Series and convert to DataFrame if necessary
+        # Ensure that 'data' is a DataFrame
         if isinstance(data, pd.Series):
             data = data.to_frame()
-            data.columns = [main_stock]
+            data.columns = [main_stock] if len(data.columns) == 1 else extra_stocks
 
         # Forward fill missing values
         data.ffill(inplace=True)
