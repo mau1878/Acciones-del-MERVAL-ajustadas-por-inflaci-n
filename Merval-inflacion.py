@@ -55,7 +55,7 @@ def main(ticker, start_date, end_date, cpi_csv_path):
 ticker = 'YPF.BA'  # Example ticker
 start_date = '2023-01-01'
 end_date = '2024-08-18'
-cpi_csv_path = 'path/to/cpi_mom_data.csv'
+cpi_csv_path = 'cpi_mom_data.csv'
 
 # Run the main function
 adjusted_stock_data = main(ticker, start_date, end_date, cpi_csv_path)
