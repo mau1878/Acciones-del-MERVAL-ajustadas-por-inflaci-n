@@ -12,39 +12,37 @@ def load_cpi_data(cpi_csv_path):
 
 # Convert monthly CPI to daily CPI
 def convert_monthly_to_daily(cpi_data):
-    daily_cpi = []
-    for i in range(len(cpi_data) - 1):
-        start_date = cpi_data['Date'].iloc[i]
-        end_date = cpi_data['Date'].iloc[i + 1]
-        inflation_rate = cpi_data['CPI_MOM'].iloc[i] / 100.0  # Convert to decimal
-        
-        # Adjust date_range without 'closed' parameter
-        date_range = pd.date_range(start_date, end_date - pd.Timedelta(days=1), freq='D')
-        daily_cpi.extend([(date, inflation_rate) for date in date_range])
+    daily_cpi = pd.date_range(start=cpi_data['Date'].min(), end=dt.datetime.today(), freq='D')
+    daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date'])
     
-    # Append the last month data
-    last_date = cpi_data['Date'].iloc[-1]
-    last_inflation_rate = cpi_data['CPI_MOM'].iloc[-1] / 100.0  # Convert to decimal
-    daily_cpi.extend([(date, last_inflation_rate) for date in pd.date_range(last_date, dt.datetime.today())])
+    # Interpolate monthly CPI to daily CPI
+    cpi_data = cpi_data.set_index('Date').reindex(daily_cpi_df['Date'])
+    cpi_data['CPI_MOM'] = cpi_data['CPI_MOM'].interpolate(method='linear')
+    daily_cpi_df['Daily_CPI'] = cpi_data['CPI_MOM'] / 100.0  # Convert to decimal
     
-    daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
     return daily_cpi_df
 
-# Adjust historical prices based on cumulative inflation calculated backwards
+# Calculate cumulative inflation backwards
+def calculate_cumulative_inflation(daily_cpi_df):
+    # Start with a cumulative inflation factor of 1.0 at the most recent date
+    daily_cpi_df = daily_cpi_df.sort_values('Date')
+    daily_cpi_df['Cumulative_Inflation'] = 1.0
+    for i in range(len(daily_cpi_df) - 2, -1, -1):
+        daily_cpi_df['Cumulative_Inflation'].iloc[i] = daily_cpi_df['Cumulative_Inflation'].iloc[i + 1] * (1 + daily_cpi_df['Daily_CPI'].iloc[i])
+    
+    return daily_cpi_df
+
+# Adjust historical prices based on cumulative inflation
 def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     # Merge daily CPI into the stock data
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
-
-    # Sort by date to calculate cumulative inflation backwards
-    prices_df = prices_df.sort_values('Date')
     
-    # Calculate cumulative inflation backwards
-    prices_df['Cumulative_Inflation'] = 1.0
-    for i in range(len(prices_df) - 2, -1, -1):
-        prices_df['Cumulative_Inflation'].iloc[i] = prices_df['Cumulative_Inflation'].iloc[i + 1] * (1 + prices_df['Daily_CPI'].iloc[i])
+    # Calculate cumulative inflation
+    daily_cpi_df = calculate_cumulative_inflation(daily_cpi_df)
     
-    # Adjust prices based on cumulative inflation
+    # Merge cumulative inflation into prices data
+    prices_df = prices_df.merge(daily_cpi_df[['Date', 'Cumulative_Inflation']], on='Date', how='left')
     prices_df['Adjusted_Price'] = prices_df['Price'] * prices_df['Cumulative_Inflation'].iloc[-1] / prices_df['Cumulative_Inflation']
     
     return prices_df
