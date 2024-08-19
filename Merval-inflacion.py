@@ -101,6 +101,11 @@ if st.button('Obtener Datos y Graficar'):
                 
                 ratio = inflation_adjusted_data[main_stock] / inflation_adjusted_data[stock]
 
+                # Ensure ratio is a DataFrame
+                if isinstance(ratio, pd.Series):
+                    ratio = ratio.to_frame()
+                    ratio.columns = [f'{main_stock} / {stock}']
+
                 # If viewing as percentages
                 if view_as_percentages:
                     reference_date = pd.Timestamp(reference_date)
@@ -112,25 +117,25 @@ if st.button('Obtener Datos y Graficar'):
                         reference_date = closest_date
                         st.warning(f"La fecha de referencia ha sido ajustada a la fecha más cercana disponible: {reference_date.date()}")
 
-                    reference_value = ratio.loc[reference_date]
+                    reference_value = ratio.loc[reference_date].values[0]
                     ratio = (ratio / reference_value - 1) * 100
-                    name_suffix = f"({reference_value:.2f})"
-                    
+                    ratio.columns = [f'{main_stock} / {stock} ({reference_value:.2f})']
+
                     # Add vertical reference line
                     fig.add_shape(
                         type="line",
-                        x0=reference_date, y0=ratio.min(), x1=reference_date, y1=ratio.max(),
+                        x0=reference_date, y0=ratio.min().values[0], x1=reference_date, y1=ratio.max().values[0],
                         line=dict(color="yellow", dash="dash"),
                         xref="x", yref="y"
                     )
                 else:
-                    name_suffix = ""
+                    ratio.columns = [f'{main_stock} / {stock}']
 
                 fig.add_trace(go.Scatter(
                     x=ratio.index,
-                    y=ratio,
+                    y=ratio.iloc[:, 0],
                     mode='lines',
-                    name=f'{main_stock} / {stock} {name_suffix}'
+                    name=ratio.columns[0]
                 ))
 
                 # If only one additional ticker is selected, show the SMA and histogram
@@ -142,7 +147,7 @@ if st.button('Obtener Datos y Graficar'):
                     fig_sma = go.Figure()
                     fig_sma.add_trace(go.Scatter(
                         x=ratio.index,
-                        y=ratio,
+                        y=ratio.iloc[:, 0],
                         mode='lines',
                         name=f'{main_stock} / {stock}'
                     ))
@@ -155,7 +160,7 @@ if st.button('Obtener Datos y Graficar'):
                     ))
                     
                     # Average value line
-                    average_value = ratio.mean()
+                    average_value = ratio.mean().values[0]
                     fig_sma.add_trace(go.Scatter(
                         x=[ratio.index.min(), ratio.index.max()],
                         y=[average_value, average_value],
@@ -176,7 +181,7 @@ if st.button('Obtener Datos y Graficar'):
                     st.plotly_chart(fig_sma, use_container_width=True)
                     
                     # Histogram of dispersion
-                    dispersion = ratio - sma
+                    dispersion = ratio.iloc[:, 0] - sma
                     dispersion = dispersion.dropna()
                     
                     fig_hist = go.Figure()
@@ -226,3 +231,4 @@ if st.button('Obtener Datos y Graficar'):
 
     except Exception as e:
         st.error(f"Error al obtener datos o graficar: {e}")
+
