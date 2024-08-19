@@ -75,15 +75,15 @@ if st.button('Obtener Datos y Graficar'):
         daily_cpi['InflationFactor'] = (1 + daily_cpi['CPI_MoM'] / 100).cumprod()
 
         # Fetch stock data
-        data = yf.download([main_stock] + extra_stocks, start=start_date, end=end_date)['Adj Close']
+        raw_data = yf.download([main_stock] + extra_stocks, start=start_date, end=end_date)['Adj Close']
 
-        # Ensure that 'data' is a DataFrame
-        if isinstance(data, pd.Series):
-            data = data.to_frame()
-            data.columns = [main_stock] + extra_stocks  # Set the correct column names
+        # Ensure that 'raw_data' is a DataFrame
+        if isinstance(raw_data, pd.Series):
+            raw_data = raw_data.to_frame()
+            raw_data.columns = [main_stock] + extra_stocks  # Set the correct column names
 
         # Forward fill missing values
-        data = data.ffill()
+        data = raw_data.ffill()
 
         # Ensure the DataFrame has all necessary columns
         if main_stock not in data.columns:
