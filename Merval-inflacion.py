@@ -80,7 +80,7 @@ if st.button('Obtener Datos y Graficar'):
         # Ensure that 'data' is a DataFrame
         if isinstance(data, pd.Series):
             data = data.to_frame()
-            data.columns = [main_stock] if len(data.columns) == 1 else extra_stocks
+            data.columns = [main_stock] + extra_stocks  # Set the correct column names
 
         # Forward fill missing values
         data.ffill(inplace=True)
@@ -196,28 +196,24 @@ if st.button('Obtener Datos y Graficar'):
                             xref="x", yref="y"
                         )
                         fig_hist.add_annotation(
-                            x=value, y=dispersion.max() * 0.9,
-                            text=f'{perc}° Percentil',
+                            x=value, y=dispersion.max() * 0.95,
+                            text=f'{perc}th percentile',
                             showarrow=True,
-                            arrowhead=1
+                            arrowhead=2
                         )
 
                     fig_hist.update_layout(
                         title='Histograma de Dispersión del Ratio',
                         xaxis_title='Dispersión',
-                        yaxis_title='Frecuencia'
+                        yaxis_title='Frecuencia',
+                        xaxis=dict(showgrid=True),
+                        yaxis=dict(showgrid=True)
                     )
 
                     st.plotly_chart(fig_hist, use_container_width=True)
 
-                    # Display maximum and minimum dispersion
-                    max_dispersion = dispersion.max()
-                    min_dispersion = dispersion.min()
-                    st.write(f'Máximo de dispersión: {max_dispersion:.2f}')
-                    st.write(f'Mínimo de dispersión: {min_dispersion:.2f}')
-
             fig.update_layout(
-                title=f'Ratio de {main_stock} con los tickers seleccionados',
+                title=f'Ratios de {main_stock} con otras acciones',
                 xaxis_title='Fecha',
                 yaxis_title='Ratio' if not view_as_percentages else 'Porcentaje',
                 xaxis_rangeslider_visible=False,
@@ -228,4 +224,5 @@ if st.button('Obtener Datos y Graficar'):
             st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f'Ocurrió un error: {e}')
+        st.error(f"Error al obtener datos o graficar: {e}")
+
