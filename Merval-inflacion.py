@@ -83,7 +83,7 @@ if st.button('Obtener Datos y Graficar'):
             data.columns = [main_stock] + extra_stocks  # Set the correct column names
 
         # Forward fill missing values
-        data.ffill(inplace=True)
+        data = data.ffill()
 
         # Ensure the DataFrame has all necessary columns
         if main_stock not in data.columns:
@@ -187,16 +187,17 @@ if st.button('Obtener Datos y Graficar'):
 
                     # Add percentile lines to histogram
                     percentiles = [5, 25, 50, 75, 95]
-                    percentile_values = np.percentile(dispersion, percentiles)
-                    for perc, value in zip(percentiles, percentile_values):
+                    for perc in percentiles:
+                        perc_value = np.percentile(dispersion, perc)
                         fig_hist.add_shape(
                             type="line",
-                            x0=value, y0=0, x1=value, y1=dispersion.max(),
+                            x0=perc_value, y0=0, x1=perc_value, y1=dispersion.max(),
                             line=dict(color='red', dash='dash'),
                             xref="x", yref="y"
                         )
                         fig_hist.add_annotation(
-                            x=value, y=dispersion.max() * 0.95,
+                            x=perc_value,
+                            y=dispersion.max() * 0.95,
                             text=f'{perc}th percentile',
                             showarrow=True,
                             arrowhead=2
@@ -225,4 +226,3 @@ if st.button('Obtener Datos y Graficar'):
 
     except Exception as e:
         st.error(f"Error al obtener datos o graficar: {e}")
-
