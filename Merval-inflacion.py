@@ -77,10 +77,10 @@ if st.button('Obtener Datos y Graficar'):
         # Fetch stock data
         data = yf.download([main_stock] + extra_stocks, start=start_date, end=end_date)['Adj Close']
 
-        # Convert Series to DataFrame if needed
+        # Check if data is a Series and convert to DataFrame if necessary
         if isinstance(data, pd.Series):
             data = data.to_frame()
-            data.columns = [main_stock]  # Set column name for the Series case
+            data.columns = [main_stock]
 
         # Ensure the DataFrame has all necessary columns
         if main_stock not in data.columns:
