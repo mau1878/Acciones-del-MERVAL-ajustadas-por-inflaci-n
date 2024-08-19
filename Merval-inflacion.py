@@ -77,7 +77,7 @@ if st.button('Obtener Datos y Graficar'):
         # Fetch stock data
         raw_data = yf.download([main_stock] + extra_stocks, start=start_date, end=end_date)['Adj Close']
 
-        # Ensure that 'raw_data' is a DataFrame
+        # Ensure 'raw_data' is a DataFrame
         if isinstance(raw_data, pd.Series):
             raw_data = raw_data.to_frame()
             raw_data.columns = [main_stock] + extra_stocks  # Set the correct column names
@@ -100,7 +100,8 @@ if st.button('Obtener Datos y Graficar'):
                     continue
                 
                 ratio = inflation_adjusted_data[main_stock] / inflation_adjusted_data[stock]
-                
+
+                # If viewing as percentages
                 if view_as_percentages:
                     reference_date = pd.Timestamp(reference_date)
 
@@ -182,15 +183,14 @@ if st.button('Obtener Datos y Graficar'):
                     fig_hist.add_trace(go.Histogram(
                         x=dispersion,
                         nbinsx=50,
-                        marker=dict(color='lightblue')
+                        marker=dict(color='blue')
                     ))
 
-                    # Add percentile lines to histogram
                     percentiles = [5, 25, 50, 75, 95]
                     for perc in percentiles:
                         perc_value = np.percentile(dispersion, perc)
                         fig_hist.add_shape(
-                            type="line",
+                            type='line',
                             x0=perc_value, y0=0, x1=perc_value, y1=dispersion.max(),
                             line=dict(color='red', dash='dash'),
                             xref="x", yref="y"
@@ -210,7 +210,7 @@ if st.button('Obtener Datos y Graficar'):
                         xaxis=dict(showgrid=True),
                         yaxis=dict(showgrid=True)
                     )
-
+                    
                     st.plotly_chart(fig_hist, use_container_width=True)
 
             fig.update_layout(
