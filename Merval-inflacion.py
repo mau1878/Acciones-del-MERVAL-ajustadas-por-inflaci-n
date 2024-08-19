@@ -3,6 +3,10 @@ import yfinance as yf
 import numpy as np
 import datetime as dt
 import streamlit as st
+import os
+
+# Define the path for the CPI CSV file
+cpi_csv_path = os.path.join(os.path.dirname(__file__), 'cpi_mom_data.csv')
 
 # Function to convert monthly CPI to daily CPI
 def convert_monthly_to_daily(cpi_data):
@@ -39,35 +43,32 @@ def fetch_stock_data(ticker, start_date, end_date):
 def main():
     st.title("Adjust Historical Stock Prices for Inflation")
 
-    # File uploader for CPI data
-    cpi_file = st.file_uploader("Upload CPI CSV File", type=["csv"])
-    
-    if cpi_file is not None:
-        cpi_data = pd.read_csv(cpi_file, parse_dates=['Date'])
-        cpi_data = cpi_data.sort_values('Date')
+    # Load CPI data from the file in the same directory as the script
+    cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'])
+    cpi_data = cpi_data.sort_values('Date')
 
-        # Date input for stock data
-        start_date = st.date_input("Start Date", value=pd.to_datetime('2023-01-01'))
-        end_date = st.date_input("End Date", value=pd.to_datetime('2024-08-18'))
-        ticker = st.text_input("Stock Ticker", value='YPF.BA')
+    # Date input for stock data
+    start_date = st.date_input("Start Date", value=pd.to_datetime('2023-01-01'))
+    end_date = st.date_input("End Date", value=pd.to_datetime('2024-08-18'))
+    ticker = st.text_input("Stock Ticker", value='YPF.BA')
 
-        # Button to perform calculations
-        if st.button("Adjust Prices"):
-            # Convert CPI data to daily
-            daily_cpi_df = convert_monthly_to_daily(cpi_data)
-            
-            # Fetch stock data
-            stock_data = fetch_stock_data(ticker, start_date, end_date)
-            
-            # Adjust stock prices for inflation
-            adjusted_stock_data = adjust_prices_for_inflation(stock_data, daily_cpi_df)
-            
-            # Display results
-            st.write("Adjusted Stock Data")
-            st.dataframe(adjusted_stock_data.head())
+    # Button to perform calculations
+    if st.button("Adjust Prices"):
+        # Convert CPI data to daily
+        daily_cpi_df = convert_monthly_to_daily(cpi_data)
+        
+        # Fetch stock data
+        stock_data = fetch_stock_data(ticker, start_date, end_date)
+        
+        # Adjust stock prices for inflation
+        adjusted_stock_data = adjust_prices_for_inflation(stock_data, daily_cpi_df)
+        
+        # Display results
+        st.write("Adjusted Stock Data")
+        st.dataframe(adjusted_stock_data.head())
 
-            # Plotting the adjusted prices
-            st.line_chart(adjusted_stock_data.set_index('Date')['Adjusted_Price'])
+        # Plotting the adjusted prices
+        st.line_chart(adjusted_stock_data.set_index('Date')['Adjusted_Price'])
 
 if __name__ == "__main__":
     main()
