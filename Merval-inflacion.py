@@ -19,18 +19,23 @@ def load_cpi_data(cpi_csv_path):
 # Convert cumulative CPI to daily cumulative CPI
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Interpolate to get daily data
-        cpi_data = cpi_data.set_index('Date')
+        # Set the index to 'Date' and sort it
+        cpi_data = cpi_data.set_index('Date').sort_index()
+        
+        # Resample to daily frequency and interpolate missing values
         cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
         
-        # Convert cumulative values to daily cumulative inflation
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI']
-        
         # Calculate daily inflation rate
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].pct_change().fillna(0) + 1
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
+        # We use the current day’s cumulative CPI to get the inflation rate compared to the previous day
+        cpi_data['Daily_Inflation'] = cpi_data['Cumulative_CPI'].pct_change().fillna(0)
         
-        # Convert to cumulative daily inflation
+        # Convert daily inflation rate to cumulative inflation
+        cpi_data['Daily_Cumulative_Inflation'] = (1 + cpi_data['Daily_Inflation']).cumprod()
+        
+        # Normalize to start at 1 (for the latest date)
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'] / cpi_data['Daily_Cumulative_Inflation'].iloc[-1]
+        
+        # Reset index to get 'Date' back as a column
         daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
