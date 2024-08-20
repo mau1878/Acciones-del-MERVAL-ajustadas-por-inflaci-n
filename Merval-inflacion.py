@@ -84,7 +84,9 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         elif 'Close' in stock_data.columns:
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         else:
-            raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
+            st.error(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
+            return pd.DataFrame(columns=['Date', 'Price'])
+        st.write(f"Data for {ticker}:", stock_data.head())  # Debugging line
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
@@ -108,6 +110,8 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
         
         ratio_df = pd.DataFrame()
         for ticker, df in stock_dfs.items():
+            if df.empty:
+                continue
             if ratio_df.empty:
                 ratio_df = df[['Date']].copy()
                 ratio_df.set_index('Date', inplace=True)
@@ -126,6 +130,7 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
                 ratio_df['Ratio'] /= ratio_df[ticker]
         
         ratio_df.reset_index(inplace=True)
+        st.write("Ratio Data:", ratio_df.head())  # Debugging line
         return ratio_df[['Date', 'Ratio']]
     except Exception as e:
         st.error(f"Error parsing and fetching ratios: {e}")
@@ -140,14 +145,17 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
             return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
         
         daily_cpi_df = convert_monthly_to_daily(cpi_data)
+        if daily_cpi_df.empty:
+            st.error("No daily CPI data available.")
+            return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
         
         ratio_data = parse_and_fetch_ratios(ratio_expr, start_date, end_date)
-        
-        if not ratio_data.empty:
-            adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
-            return adjusted_ratio_data
-        else:
+        if ratio_data.empty:
+            st.error("No ratio data available.")
             return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+        
+        adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
+        return adjusted_ratio_data
     except Exception as e:
         st.error(f"Error in main function: {e}")
         return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
