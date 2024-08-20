@@ -16,16 +16,20 @@ def convert_monthly_to_daily(cpi_data):
     for i in range(len(cpi_data) - 1):
         start_date = cpi_data['Date'].iloc[i]
         end_date = cpi_data['Date'].iloc[i + 1]
-        inflation_rate = cpi_data['CPI_MOM'].iloc[i]  # Already in decimal format
+        monthly_rate = cpi_data['CPI_MOM'].iloc[i]
         
-        # Generate daily dates and apply inflation rate
+        # Convert monthly rate to daily rate
+        daily_rate = (1 + monthly_rate) ** (1/30) - 1
+        
+        # Generate daily dates and apply daily inflation rate
         date_range = pd.date_range(start_date, end_date - pd.Timedelta(days=1), freq='D')
-        daily_cpi.extend([(date, inflation_rate) for date in date_range])
+        daily_cpi.extend([(date, daily_rate) for date in date_range])
     
     # Append the last month data
     last_date = cpi_data['Date'].iloc[-1]
-    last_inflation_rate = cpi_data['CPI_MOM'].iloc[-1]  # Already in decimal format
-    daily_cpi.extend([(date, last_inflation_rate) for date in pd.date_range(last_date, dt.datetime.today())])
+    last_monthly_rate = cpi_data['CPI_MOM'].iloc[-1]
+    last_daily_rate = (1 + last_monthly_rate) ** (1/30) - 1
+    daily_cpi.extend([(date, last_daily_rate) for date in pd.date_range(last_date, dt.datetime.today())])
     
     daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
     return daily_cpi_df
