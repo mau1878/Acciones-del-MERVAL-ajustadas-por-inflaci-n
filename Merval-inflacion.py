@@ -35,33 +35,6 @@ def convert_monthly_to_daily(cpi_data):
     daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
     return daily_cpi_df
 
-# Adjust historical prices based on daily CPI
-def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
-    # Merge daily CPI into the stock data
-    prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].ffill()  # Forward fill missing CPI values
-    
-    # Ensure proper data type for inflation calculations
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
-    
-    # Check for 'Price' column
-    if 'Price' not in prices_df.columns:
-        st.error("The 'Price' column is missing from the DataFrame.")
-        print("Columns in prices_df:", prices_df.columns)  # Debugging line
-        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
-    
-    # Calculate cumulative product of daily inflation rates
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
-    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)  # Calculate cumulative inflation
-    
-    # Find the cumulative inflation factor for the earliest date
-    earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
-    
-    # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
-    
-    return prices_df
-
 # Fetch historical stock prices
 def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     try:
@@ -69,7 +42,6 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         if stock_data.empty:
             raise ValueError(f"No data found for ticker {ticker}")
         stock_data.reset_index(inplace=True)
-        print(f"Fetched data for {ticker}:\n", stock_data.head())  # Debugging line
         
         # Check available columns and rename
         if 'Adj Close' in stock_data.columns:
@@ -79,10 +51,8 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         else:
             raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
         
-        # Ensure 'Price' column is present
         if 'Price' not in stock_data.columns:
             st.error(f"'Price' column is missing in the data for ticker {ticker}")
-            print("Columns in stock_data:", stock_data.columns)  # Debugging line
             return pd.DataFrame(columns=['Date', 'Price'])
         
         return stock_data[['Date', 'Price']]
@@ -102,31 +72,27 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     for part in parts:
         ticker = part.strip()
         if ticker:
-            stock_dfs[ticker] = fetch_stock_data(ticker, start_date, end_date)
+            df = fetch_stock_data(ticker, start_date, end_date)
+            if not df.empty:
+                stock_dfs[ticker] = df
+    
+    # Check if any data was fetched
+    if not stock_dfs:
+        st.warning("No data fetched for the provided tickers.")
+        return pd.DataFrame(columns=['Date', 'Ratio'])
     
     # Create a DataFrame for the ratio
     ratio_df = pd.DataFrame()
     for ticker, df in stock_dfs.items():
-        if df.empty:
-            st.warning(f"No data for ticker: {ticker}")
-            continue
         if ratio_df.empty:
             ratio_df = df[['Date']].copy()
             ratio_df.set_index('Date', inplace=True)
-        
         df.set_index('Date', inplace=True)
         if 'Price' in df.columns:
             ratio_df[ticker] = df['Price']
-        else:
-            st.error(f"'Price' column missing for ticker: {ticker}")
-            continue
     
     # Forward fill missing values for all stocks
-    ratio_df = ratio_df.ffill()  # Use ffill instead of deprecated method
-    
-    # Debugging prints
-    print("Ratio DataFrame Columns:", ratio_df.columns)
-    print("Ratio DataFrame Head:\n", ratio_df.head())
+    ratio_df = ratio_df.ffill()
     
     # Calculate the ratio
     ratio_df['Ratio'] = ratio_df[parts[0]]
@@ -140,6 +106,36 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Reset index to get 'Date' back as a column
     ratio_df.reset_index(inplace=True)
     return ratio_df[['Date', 'Ratio']]
+
+# Adjust historical prices based on daily CPI
+def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
+    if prices_df.empty:
+        st.warning("No prices data available for inflation adjustment.")
+        return prices_df
+    
+    # Merge daily CPI into the stock data
+    prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].ffill()  # Forward fill missing CPI values
+    
+    # Ensure proper data type for inflation calculations
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
+    
+    # Check for 'Price' column
+    if 'Price' not in prices_df.columns:
+        st.error("The 'Price' column is missing from the DataFrame.")
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+    
+    # Calculate cumulative product of daily inflation rates
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
+    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)  # Calculate cumulative inflation
+    
+    # Find the cumulative inflation factor for the earliest date
+    earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
+    
+    # Adjust prices based on cumulative inflation
+    prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
+    
+    return prices_df
 
 # Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
