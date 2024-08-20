@@ -177,4 +177,7 @@ if st.button("Get Data and Plot"):
             '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
             '<extra></extra>'
         )
-        fig.update_traces(customdata=adjusted_ratio_data[['Cumulative_Inflation_Hover', 'Unadjusted_P
+        fig.update_traces(customdata=adjusted_ratio_data[['Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
+        st.plotly_chart(fig)
+    else:
+        st.write("No data available for the selected ratio and date range.")
