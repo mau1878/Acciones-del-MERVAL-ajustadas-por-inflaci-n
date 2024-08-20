@@ -78,7 +78,9 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         stock_data = yf.download(ticker, start=start_date, end=end_date, interval='1d')
         if stock_data.empty:
             raise ValueError(f"No data found for ticker {ticker}")
+        
         stock_data.reset_index(inplace=True)
+        
         if 'Adj Close' in stock_data.columns:
             stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
         elif 'Close' in stock_data.columns:
@@ -86,6 +88,7 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         else:
             st.error(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
             return pd.DataFrame(columns=['Date', 'Price'])
+        
         st.write(f"Data for {ticker}:", stock_data.head())  # Debugging line
         return stock_data[['Date', 'Price']]
     except Exception as e:
