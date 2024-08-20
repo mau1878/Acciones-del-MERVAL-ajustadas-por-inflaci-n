@@ -25,9 +25,12 @@ def convert_cumulative_to_daily(cpi_data):
         
         # Convert cumulative values to daily cumulative inflation
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI']
+        
+        # Calculate daily inflation rate
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].pct_change().fillna(0) + 1
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
         
+        # Convert to cumulative daily inflation
         daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
