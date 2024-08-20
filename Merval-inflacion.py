@@ -59,7 +59,7 @@ def convert_cumulative_to_daily(cpi_data):
         daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
-@@ -143,10 +135,9 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
+
 # Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
     try:
