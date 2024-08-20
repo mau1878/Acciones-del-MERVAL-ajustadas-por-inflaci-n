@@ -5,6 +5,7 @@ import datetime as dt
 import streamlit as st
 import re
 import plotly.express as px
+
 # Load the CPI data
 def load_cpi_data(cpi_csv_path):
     try:
@@ -19,10 +20,7 @@ def load_cpi_data(cpi_csv_path):
 
 # Adjust cumulative CPI values so that the present day is 1
 def adjust_cumulative_cpi(cpi_data):
-# Convert cumulative CPI to daily cumulative CPI
-def convert_cumulative_to_daily(cpi_data):
     try:
-        # Reverse the data to make the most recent value first
         # Reverse the data to get correct cumulative inflation values
         cpi_data = cpi_data[::-1].reset_index(drop=True)
 
@@ -31,10 +29,7 @@ def convert_cumulative_to_daily(cpi_data):
 
         # Reverse data back to original order
         cpi_data = cpi_data[::-1].reset_index(drop=True)
-        # Scale cumulative CPI values so that the most recent value equals 1
-        most_recent_value = cpi_data['Cumulative_CPI'].iloc[0]
-        cpi_data['Scaled_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / most_recent_value
-
+        
         daily_cpi_df = cpi_data[['Date', 'Adjusted_Cumulative_CPI']]
         return daily_cpi_df
     except Exception as e:
@@ -44,10 +39,8 @@ def convert_cumulative_to_daily(cpi_data):
 # Convert adjusted cumulative CPI to daily cumulative CPI
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Calculate daily inflation values
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Adjusted_Cumulative_CPI'] / cpi_data['Adjusted_Cumulative_CPI'].shift(-1)
         # Calculate daily inflation values based on the scaled cumulative CPI
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Scaled_Cumulative_CPI'] / cpi_data['Scaled_Cumulative_CPI'].shift(-1)
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Adjusted_Cumulative_CPI'] / cpi_data['Adjusted_Cumulative_CPI'].shift(-1)
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
 
         # Make cumulative product to get daily inflation values
@@ -59,16 +52,16 @@ def convert_cumulative_to_daily(cpi_data):
         daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
+        st.error(f"Error converting cumulative CPI to daily CPI: {e}")
+        return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
 
 # Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
     try:
         # Load CPI data and adjust for inflation
-        # Load CPI data and convert to daily
         cpi_data = load_cpi_data(cpi_csv_path)
         adjusted_cpi_df = adjust_cumulative_cpi(cpi_data)
         daily_cpi_df = convert_cumulative_to_daily(adjusted_cpi_df)
-        daily_cpi_df = convert_cumulative_to_daily(cpi_data)
 
         # Parse and fetch ratio data
         ratio_data = parse_and_fetch_ratios(ratio_expr, start_date, end_date)
@@ -82,6 +75,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
     except Exception as e:
         st.error(f"Error in main function: {e}")
         return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+
 # Streamlit UI
 st.title("Stock Price Adjustment for Inflation")
 ratio_expr = st.text_input("Enter stock ratio (e.g., YPFD.BA/YPF or GGAL.BA*10/GGAL):", 'YPF.BA/YPF')
