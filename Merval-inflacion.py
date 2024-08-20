@@ -39,7 +39,7 @@ def convert_monthly_to_daily(cpi_data):
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     # Merge daily CPI into the stock data
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].fillna(method='ffill')  # Forward fill missing CPI values
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].ffill()  # Forward fill missing CPI values
     
     # Ensure proper data type for inflation calculations
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
@@ -97,12 +97,19 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Create a DataFrame for the ratio
     ratio_df = pd.DataFrame()
     for ticker, df in stock_dfs.items():
+        if df.empty:
+            st.warning(f"No data for ticker: {ticker}")
+            continue
         if ratio_df.empty:
             ratio_df = df[['Date']].copy()
             ratio_df.set_index('Date', inplace=True)
         
         df.set_index('Date', inplace=True)
-        ratio_df[ticker] = df['Price']
+        if 'Price' in df.columns:
+            ratio_df[ticker] = df['Price']
+        else:
+            st.error(f"'Price' column missing for ticker: {ticker}")
+            continue
     
     # Forward fill missing values for all stocks
     ratio_df = ratio_df.ffill()  # Use ffill instead of deprecated method
