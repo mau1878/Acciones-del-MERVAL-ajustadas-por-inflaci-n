@@ -155,7 +155,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
 # Streamlit UI
 st.title("Stock Price Adjustment for Inflation")
 
-ratio_expr = st.text_input("Enter stock ratio (e.g., YPFD.BA/YPF or GGAL.BA*10/GGAL):", 'YPF.BA/YPF')
+ratio_expr = st.text_input("Enter stock ratio (e.g., YPFD.BA/YPF or GGAL.BA*10/GGAL):", 'YPFD.BA/YPF')
 start_date = st.date_input("Start date:", dt.datetime(2023, 1, 1))
 end_date = st.date_input("End date:", dt.datetime.today())
 
