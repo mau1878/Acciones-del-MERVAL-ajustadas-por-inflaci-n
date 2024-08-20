@@ -4,6 +4,7 @@ import numpy as np
 import datetime as dt
 import streamlit as st
 import re
+import plotly.express as px
 
 # Load the CPI data
 def load_cpi_data(cpi_csv_path):
@@ -35,19 +36,43 @@ def convert_monthly_to_daily(cpi_data):
     daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_CPI'])
     return daily_cpi_df
 
+# Adjust historical prices based on daily CPI
+def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
+    # Merge daily CPI into the stock data
+    prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].fillna(method='ffill')  # Forward fill missing CPI values
+    
+    # Ensure proper data type for inflation calculations
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
+    
+    # Calculate cumulative product of daily inflation rates
+    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].add(1).cumprod().astype(np.float64)
+    
+    # Normalize cumulative inflation so that it starts from 1 at the latest date
+    prices_df['Cumulative_Inflation'] = prices_df['Cumulative_Inflation'] / prices_df['Cumulative_Inflation'].iloc[-1]
+    
+    # Adjust prices based on cumulative inflation
+    prices_df['Adjusted_Price'] = prices_df['Ratio'] / prices_df['Cumulative_Inflation']
+    
+    return prices_df
+
 # Fetch historical stock prices
 def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
-    stock_data = yf.download(ticker, start=start_date, end=end_date, interval='1d')
-    if stock_data.empty:
-        raise ValueError(f"No data found for ticker {ticker}")
-    stock_data.reset_index(inplace=True)
-    if 'Adj Close' in stock_data.columns:
-        stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
-    elif 'Close' in stock_data.columns:
-        stock_data.rename(columns={'Close': 'Price'}, inplace=True)
-    else:
-        raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
-    return stock_data[['Date', 'Price']]
+    try:
+        stock_data = yf.download(ticker, start=start_date, end=end_date, interval='1d')
+        if stock_data.empty:
+            raise ValueError(f"No data found for ticker {ticker}")
+        stock_data.reset_index(inplace=True)
+        if 'Adj Close' in stock_data.columns:
+            stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
+        elif 'Close' in stock_data.columns:
+            stock_data.rename(columns={'Close': 'Price'}, inplace=True)
+        else:
+            raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
+        return stock_data[['Date', 'Price']]
+    except Exception as e:
+        st.error(f"Error fetching data for {ticker}: {e}")
+        return pd.DataFrame(columns=['Date', 'Price'])
 
 # Parse ratio expressions and fetch data
 def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -59,11 +84,12 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Fetch individual stock data
     stock_dfs = {}
     for part in parts:
-        ticker = re.findall(r"[A-Z\.]+", part.strip())[0]
-        multiplier = float(re.findall(r"\d+", part.strip())[0]) if re.findall(r"\d+", part.strip()) else 1.0
-        if ticker:
-            stock_dfs[ticker] = fetch_stock_data(ticker, start_date, end_date)
-            stock_dfs[ticker]['Price'] *= multiplier  # Apply the multiplier
+        if part.isnumeric():
+            stock_dfs[part] = pd.DataFrame({'Date': pd.date_range(start=start_date, end=end_date), 'Price': float(part)})
+        else:
+            ticker = part.strip()
+            if ticker:
+                stock_dfs[ticker] = fetch_stock_data(ticker, start_date, end_date)
     
     # Create a DataFrame for the ratio
     ratio_df = pd.DataFrame()
@@ -90,23 +116,6 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Reset index to get 'Date' back as a column
     ratio_df.reset_index(inplace=True)
     return ratio_df[['Date', 'Ratio']]
-
-# Adjust historical prices based on daily CPI
-def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
-    # Merge daily CPI into the stock data
-    prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].fillna(method='ffill')  # Forward fill missing CPI values
-    
-    # Ensure proper data type for inflation calculations
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
-    
-    # Calculate cumulative inflation rate backward
-    prices_df['Cumulative_Inflation'] = (1 + prices_df['Daily_CPI'][::-1]).cumprod()[::-1]
-    
-    # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Ratio'] * prices_df['Cumulative_Inflation']
-    
-    return prices_df
 
 # Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
@@ -137,6 +146,13 @@ if st.button("Get Data and Plot"):
     
     if not adjusted_ratio_data.empty:
         st.write(adjusted_ratio_data.head())
-        st.line_chart(adjusted_ratio_data.set_index('Date')[['Ratio', 'Adjusted_Price']])
+        
+        # Interactive plot using Plotly
+        fig = px.line(adjusted_ratio_data, x='Date', y=['Ratio', 'Adjusted_Price'], 
+                      labels={'value': 'Price', 'Date': 'Date'}, 
+                      title="Adjusted and Unadjusted Stock Price Ratios Over Time",
+                      hover_data={'Date': '|%B %d, %Y'})
+        fig.update_layout(hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.write("No data available for the selected ratio and date range.")
