@@ -18,25 +18,33 @@ def load_cpi_data(cpi_csv_path):
         st.error(f"Error loading CPI data: {e}")
         return pd.DataFrame()
 
-# Convert cumulative CPI to daily cumulative CPI with normalization
-def convert_cumulative_to_daily(cpi_data):
+# Adjust cumulative CPI values so that the present day is 1
+def adjust_cumulative_cpi(cpi_data):
     try:
-        # Reverse the data to handle increasing cumulative values
+        # Reverse the data to make the most recent value first
         cpi_data = cpi_data[::-1].reset_index(drop=True)
         
-        # Normalize cumulative CPI so the last value is 1
-        last_cumulative_cpi = cpi_data['Cumulative_CPI'].iloc[0]
-        cpi_data['Normalized_CPI'] = cpi_data['Cumulative_CPI'] / last_cumulative_cpi
+        # Normalize the cumulative CPI values
+        cpi_data['Adjusted_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].iloc[0]
         
-        # Calculate daily cumulative inflation
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Normalized_CPI'] / cpi_data['Normalized_CPI'].shift(-1)
+        # Reverse data back to original order
+        cpi_data = cpi_data[::-1].reset_index(drop=True)
+        
+        daily_cpi_df = cpi_data[['Date', 'Adjusted_Cumulative_CPI']]
+        return daily_cpi_df
+    except Exception as e:
+        st.error(f"Error adjusting cumulative CPI: {e}")
+        return pd.DataFrame(columns=['Date', 'Adjusted_Cumulative_CPI'])
+
+# Convert adjusted cumulative CPI to daily cumulative CPI
+def convert_cumulative_to_daily(cpi_data):
+    try:
+        # Calculate daily inflation values
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Adjusted_Cumulative_CPI'] / cpi_data['Adjusted_Cumulative_CPI'].shift(-1)
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
         
         # Make cumulative product to get daily inflation values
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
-        
-        # Reverse data back to original order
-        cpi_data = cpi_data[::-1].reset_index(drop=True)
         
         daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
@@ -135,9 +143,10 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
 # Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
     try:
-        # Load CPI data and convert to daily
+        # Load CPI data and adjust for inflation
         cpi_data = load_cpi_data(cpi_csv_path)
-        daily_cpi_df = convert_cumulative_to_daily(cpi_data)
+        adjusted_cpi_df = adjust_cumulative_cpi(cpi_data)
+        daily_cpi_df = convert_cumulative_to_daily(adjusted_cpi_df)
         
         # Parse and fetch ratio data
         ratio_data = parse_and_fetch_ratios(ratio_expr, start_date, end_date)
