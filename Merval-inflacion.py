@@ -9,7 +9,7 @@ import plotly.express as px
 # Load the CPI data
 def load_cpi_data(cpi_csv_path):
     try:
-        cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'])
+        cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'], dayfirst=True)
         cpi_data = cpi_data.sort_values('Date')
         return cpi_data
     except Exception as e:
@@ -166,7 +166,7 @@ if st.button("Get Data and Plot"):
             '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
             '<extra></extra>'
         )
-        fig.update_traces(customdata=adjusted_ratio_data[['Daily_Cumulative_Inflation', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
+        fig.update_traces(customdata=adjusted_ratio_data[['Daily_Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
         st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
