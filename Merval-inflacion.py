@@ -4,15 +4,16 @@ import numpy as np
 import datetime as dt
 import streamlit as st
 import re
+from typing import Tuple
 
 # Load the CPI data
-def load_cpi_data(cpi_csv_path):
+def load_cpi_data(cpi_csv_path: str) -> pd.DataFrame:
     cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'])
     cpi_data = cpi_data.sort_values('Date')
     return cpi_data
 
 # Convert monthly CPI to daily CPI
-def convert_monthly_to_daily(cpi_data):
+def convert_monthly_to_daily(cpi_data: pd.DataFrame) -> pd.DataFrame:
     daily_cpi = []
     for i in range(len(cpi_data) - 1):
         start_date = cpi_data['Date'].iloc[i]
@@ -36,7 +37,7 @@ def convert_monthly_to_daily(cpi_data):
     return daily_cpi_df
 
 # Adjust historical prices based on daily CPI
-def adjust_prices_for_inflation(prices_df, daily_cpi_df):
+def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     # Merge daily CPI into the stock data
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
@@ -45,23 +46,19 @@ def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
     
     # Calculate cumulative product of daily inflation rates
-    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].apply(lambda x: x + 1)  # Convert inflation rates to growth factors
-    prices_df['Cumulative_Inflation'] = (prices_df['Daily_CPI'].cumprod()).astype(np.float64)  # Calculate cumulative inflation
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
+    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)  # Calculate cumulative inflation
     
     # Find the cumulative inflation factor for the earliest date
     earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
     
     # Adjust prices based on cumulative inflation
-    if 'Price' in prices_df.columns:
-        prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
-    else:
-        st.error("The 'Price' column is missing in the DataFrame.")
-        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Ratio'])
+    prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
     
     return prices_df
 
 # Fetch historical stock prices
-def fetch_stock_data(ticker, start_date, end_date):
+def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     try:
         stock_data = yf.download(ticker, start=start_date, end=end_date, interval='1d')
         if stock_data.empty:
@@ -73,54 +70,61 @@ def fetch_stock_data(ticker, start_date, end_date):
         st.error(f"Error fetching data for {ticker}: {e}")
         return pd.DataFrame(columns=['Date', 'Price'])
 
-# Parse and evaluate the stock ratio expression
-def compute_stock_ratios(ratio_expr, start_date, end_date):
-    # Extract tickers and operators from the ratio expression
-    tickers = re.findall(r'[A-Za-z0-9._-]+', ratio_expr)
-    operators = re.findall(r'[*/]', ratio_expr)
+# Parse and evaluate stock ratios
+def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> pd.DataFrame:
+    # Split the ratio expression
+    ratio_expr = ratio_expr.upper()
+    parts = re.split(r'[\/*]', ratio_expr)
+    operators = re.findall(r'[\/*]', ratio_expr)
     
-    # Fetch price data for each ticker
-    price_data = {}
-    for ticker in tickers:
-        if ticker not in price_data:
-            price_data[ticker] = fetch_stock_data(ticker, start_date, end_date)
+    # Fetch individual stock data
+    stock_dfs = {}
+    for part in parts:
+        ticker = part.strip()
+        if ticker:
+            stock_dfs[ticker] = fetch_stock_data(ticker, start_date, end_date)
     
-    # Create an empty DataFrame for the ratios
+    # Create a DataFrame for the ratio
     ratio_df = pd.DataFrame()
-    
-    # Compute the ratio expression
-    for i, ticker in enumerate(tickers):
+    for ticker, df in stock_dfs.items():
         if ratio_df.empty:
-            ratio_df = price_data[ticker].copy()
-            ratio_df.rename(columns={'Price': f'Price_{ticker}'}, inplace=True)
-        else:
-            if operators[i-1] == '*':
-                ratio_df[f'Price_{ticker}'] = price_data[ticker]['Price'] * ratio_df[f'Price_{tickers[i-1]}']
-            elif operators[i-1] == '/':
-                ratio_df[f'Price_{ticker}'] = price_data[ticker]['Price'] / ratio_df[f'Price_{tickers[i-1]}']
+            ratio_df = df[['Date']].copy()
+            ratio_df.set_index('Date', inplace=True)
+        
+        df.set_index('Date', inplace=True)
+        ratio_df[ticker] = df['Price']
     
-    ratio_df['Date'] = price_data[tickers[0]]['Date']
-    ratio_df.set_index('Date', inplace=True)
-    ratio_df = ratio_df[[f'Price_{tickers[-1]}']]
-    ratio_df.rename(columns={f'Price_{tickers[-1]}': 'Ratio'}, inplace=True)
+    # Forward fill missing values for all stocks
+    ratio_df = ratio_df.fillna(method='ffill')
     
-    return ratio_df
+    # Calculate the ratio
+    ratio_df['Ratio'] = ratio_df[parts[0]]
+    for i, op in enumerate(operators):
+        ticker = parts[i + 1]
+        if op == '*':
+            ratio_df['Ratio'] *= ratio_df[ticker]
+        elif op == '/':
+            ratio_df['Ratio'] /= ratio_df[ticker]
+    
+    # Reset index to get 'Date' back as a column
+    ratio_df.reset_index(inplace=True)
+    return ratio_df[['Date', 'Ratio']]
 
-# Main function to adjust stock ratios for inflation
-def main(ratio_expr, start_date, end_date, cpi_csv_path):
+# Main function to adjust historical stock ratios for inflation
+def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
     # Load CPI data and convert to daily
     cpi_data = load_cpi_data(cpi_csv_path)
     daily_cpi_df = convert_monthly_to_daily(cpi_data)
     
-    # Compute stock ratios
-    ratio_data = compute_stock_ratios(ratio_expr, start_date, end_date)
+    # Parse and fetch ratio data
+    ratio_data = parse_and_fetch_ratios(ratio_expr, start_date, end_date)
     
-    # Adjust stock ratios for inflation
+    # Adjust ratio data for inflation
     if not ratio_data.empty:
         adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
         return adjusted_ratio_data
     else:
-        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Ratio'])
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
 
 # Streamlit UI
 st.title("Stock Ratio Adjustment for Inflation")
@@ -135,6 +139,6 @@ if st.button("Get Data and Plot"):
     
     if not adjusted_ratio_data.empty:
         st.write(adjusted_ratio_data.head())
-        st.line_chart(adjusted_ratio_data.set_index('Date')[['Ratio', 'Adjusted_Ratio']])
+        st.line_chart(adjusted_ratio_data.set_index('Date')[['Ratio', 'Adjusted_Price']])
     else:
         st.write("No data available for the selected ratio and date range.")
