@@ -28,9 +28,12 @@ def convert_cumulative_to_daily(cpi_data):
         # Debug: Print raw interpolated CPI data
         print("Interpolated CPI Data:", cpi_data.head())
 
-        # Ensure the cumulative CPI starts at 1 for the latest date
+        # Normalize cumulative CPI so that the most recent date starts at 1
         cpi_data['Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].iloc[-1]
         
+        # Debug: Print normalized cumulative CPI
+        print("Normalized Cumulative CPI:", cpi_data[['Cumulative_CPI']].head())
+
         # Calculate daily inflation rates
         cpi_data['Daily_Inflation'] = cpi_data['Cumulative_CPI'].pct_change().fillna(0)
 
@@ -40,9 +43,9 @@ def convert_cumulative_to_daily(cpi_data):
         # Debug: Print daily inflation rates
         print("Daily Inflation Rates:", cpi_data[['Daily_Inflation']].head())
 
-        # Convert daily inflation rates to cumulative inflation
+        # Calculate cumulative inflation from daily rates
         cpi_data['Daily_Cumulative_Inflation'] = (1 + cpi_data['Daily_Inflation']).cumprod()
-        
+
         # Debug: Print cumulative inflation
         print("Daily Cumulative Inflation Data:", cpi_data[['Daily_Cumulative_Inflation']].head())
 
@@ -52,6 +55,7 @@ def convert_cumulative_to_daily(cpi_data):
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
+
 
 
 
