@@ -39,7 +39,7 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     try:
         # Merge daily CPI into the stock data
         prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-        prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].fillna(method='ffill')  # Forward fill missing CPI values
+        prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].ffill()  # Forward fill missing CPI values
         
         # Check if 'Price' column is available, if not, use 'Ratio' instead
         price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
@@ -166,7 +166,7 @@ if st.button("Get Data and Plot"):
             '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
             '<extra></extra>'
         )
-        fig.update_traces(customdata=adjusted_ratio_data[['Daily_Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
+        fig.update_traces(customdata=adjusted_ratio_data[['Daily_Cumulative_Inflation', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
         st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
