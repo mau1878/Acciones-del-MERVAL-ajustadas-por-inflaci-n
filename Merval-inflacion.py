@@ -51,7 +51,7 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
         price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
         
         # Adjust prices based on cumulative inflation
-        prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Daily_Cumulative_Inflation']
+        prices_df['Adjusted_Price'] = prices_df[price_col] / prices_df['Daily_Cumulative_Inflation']
         
         # Set up hover data for Plotly
         prices_df['Cumulative_Inflation_Hover'] = prices_df['Daily_Cumulative_Inflation'].round(4)
