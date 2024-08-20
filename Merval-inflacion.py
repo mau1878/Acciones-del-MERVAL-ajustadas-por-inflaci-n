@@ -22,14 +22,16 @@ def convert_cumulative_to_daily(cpi_data):
         # Set the index to 'Date' and sort it
         cpi_data = cpi_data.set_index('Date').sort_index()
         
-        # Resample to daily frequency and interpolate missing values
+        # Interpolate missing values to ensure continuous data
         cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
-        
-        # Calculate daily inflation rate
-        # We use the current day’s cumulative CPI to get the inflation rate compared to the previous day
+
+        # Calculate daily percentage change in cumulative CPI
         cpi_data['Daily_Inflation'] = cpi_data['Cumulative_CPI'].pct_change().fillna(0)
         
-        # Convert daily inflation rate to cumulative inflation
+        # Smoothen out abrupt changes using rolling average (optional, adjust window as needed)
+        cpi_data['Daily_Inflation'] = cpi_data['Daily_Inflation'].rolling(window=7, min_periods=1).mean()
+        
+        # Convert daily inflation rates to cumulative inflation
         cpi_data['Daily_Cumulative_Inflation'] = (1 + cpi_data['Daily_Inflation']).cumprod()
         
         # Normalize to start at 1 (for the latest date)
@@ -41,6 +43,7 @@ def convert_cumulative_to_daily(cpi_data):
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
+
 
 # Adjust historical prices based on daily cumulative CPI
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
