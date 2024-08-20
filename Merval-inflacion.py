@@ -19,26 +19,25 @@ def load_cpi_data(cpi_csv_path):
         return pd.DataFrame()
 
 # Convert cumulative CPI to daily cumulative CPI with smoothing
+# Convert cumulative CPI to daily cumulative CPI while considering your specific CPI format
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Reverse the data to get correct cumulative inflation values
+        # Reverse the data to get correct cumulative inflation values (most recent date first)
         cpi_data = cpi_data[::-1].reset_index(drop=True)
-        
-        # Scale cumulative CPI values so that the most recent value equals 1
-        most_recent_value = cpi_data['Cumulative_CPI'].iloc[0]
-        cpi_data['Scaled_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / most_recent_value
-        
-        # Interpolate daily values across each month
+
+        # Interpolate daily values to get a smooth transition between months
         cpi_data = cpi_data.set_index('Date').resample('D').interpolate(method='linear').reset_index()
 
-        # Calculate daily inflation values based on the interpolated scaled cumulative CPI
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Scaled_Cumulative_CPI'] / cpi_data['Scaled_Cumulative_CPI'].shift(-1)
+        # Since values increase as we go back in time, we'll calculate daily inflation as:
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(-1)
+        
+        # Fill NaNs that might appear at the end due to shifting
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
         
-        # Make cumulative product to get daily inflation values
+        # The cumulative product of daily inflation gives us the cumulative inflation starting from the most recent date
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
         
-        # Reverse data back to original order
+        # Reverse data back to original order (oldest date first)
         cpi_data = cpi_data[::-1].reset_index(drop=True)
         
         daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
@@ -46,6 +45,7 @@ def convert_cumulative_to_daily(cpi_data):
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
+
 
 # Adjust historical prices based on daily cumulative CPI
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
