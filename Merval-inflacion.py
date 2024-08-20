@@ -4,16 +4,15 @@ import numpy as np
 import datetime as dt
 import streamlit as st
 import re
-from typing import Tuple
 
 # Load the CPI data
-def load_cpi_data(cpi_csv_path: str) -> pd.DataFrame:
+def load_cpi_data(cpi_csv_path):
     cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'])
     cpi_data = cpi_data.sort_values('Date')
     return cpi_data
 
 # Convert monthly CPI to daily CPI
-def convert_monthly_to_daily(cpi_data: pd.DataFrame) -> pd.DataFrame:
+def convert_monthly_to_daily(cpi_data):
     daily_cpi = []
     for i in range(len(cpi_data) - 1):
         start_date = cpi_data['Date'].iloc[i]
@@ -42,6 +41,10 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
     
+    # Debugging prints
+    print("Prices DataFrame Columns:", prices_df.columns)
+    print("Prices DataFrame Head:\n", prices_df.head())
+    
     # Ensure proper data type for inflation calculations
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
     
@@ -51,6 +54,9 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     
     # Find the cumulative inflation factor for the earliest date
     earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
+    
+    # Debugging prints
+    print("Earliest Cumulative Inflation:", earliest_cumulative_inflation)
     
     # Adjust prices based on cumulative inflation
     prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
@@ -64,13 +70,16 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         if stock_data.empty:
             raise ValueError(f"No data found for ticker {ticker}")
         stock_data.reset_index(inplace=True)
-        stock_data.rename(columns={'Date': 'Date', 'Adj Close': 'Price'}, inplace=True)
+        if 'Adj Close' in stock_data.columns:
+            stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
+        else:
+            stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
         return pd.DataFrame(columns=['Date', 'Price'])
 
-# Parse and evaluate stock ratios
+# Parse ratio expressions and fetch data
 def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> pd.DataFrame:
     # Split the ratio expression
     ratio_expr = ratio_expr.upper()
@@ -97,6 +106,10 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Forward fill missing values for all stocks
     ratio_df = ratio_df.fillna(method='ffill')
     
+    # Debugging prints
+    print("Ratio DataFrame Columns:", ratio_df.columns)
+    print("Ratio DataFrame Head:\n", ratio_df.head())
+    
     # Calculate the ratio
     ratio_df['Ratio'] = ratio_df[parts[0]]
     for i, op in enumerate(operators):
@@ -110,7 +123,7 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     ratio_df.reset_index(inplace=True)
     return ratio_df[['Date', 'Ratio']]
 
-# Main function to adjust historical stock ratios for inflation
+# Main function to adjust historical stock prices for inflation
 def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> pd.DataFrame:
     # Load CPI data and convert to daily
     cpi_data = load_cpi_data(cpi_csv_path)
@@ -119,7 +132,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
     # Parse and fetch ratio data
     ratio_data = parse_and_fetch_ratios(ratio_expr, start_date, end_date)
     
-    # Adjust ratio data for inflation
+    # Adjust ratio prices for inflation
     if not ratio_data.empty:
         adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
         return adjusted_ratio_data
@@ -127,7 +140,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
         return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
 
 # Streamlit UI
-st.title("Stock Ratio Adjustment for Inflation")
+st.title("Stock Price Adjustment for Inflation")
 
 ratio_expr = st.text_input("Enter stock ratio (e.g., YPFD.BA/YPF or GGAL.BA*10/GGAL):", 'YPF.BA/YPF')
 start_date = st.date_input("Start date:", dt.datetime(2023, 1, 1))
