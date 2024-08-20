@@ -44,6 +44,11 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     # Ensure proper data type for inflation calculations
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
     
+    # Check for 'Price' column
+    if 'Price' not in prices_df.columns:
+        st.error("The 'Price' column is missing from the DataFrame.")
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+    
     # Calculate cumulative product of daily inflation rates
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
     prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)  # Calculate cumulative inflation
@@ -69,6 +74,7 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         else:
             raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
+        print(f"Columns in fetched data for {ticker}: {stock_data.columns}")
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
