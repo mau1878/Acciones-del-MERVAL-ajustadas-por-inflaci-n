@@ -52,7 +52,11 @@ def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
     
     # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
+    if 'Price' in prices_df.columns:
+        prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
+    else:
+        st.error("The 'Price' column is missing in the DataFrame.")
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Ratio'])
     
     return prices_df
 
