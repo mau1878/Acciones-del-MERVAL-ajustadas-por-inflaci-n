@@ -18,14 +18,18 @@ def load_cpi_data(cpi_csv_path):
         st.error(f"Error loading CPI data: {e}")
         return pd.DataFrame()
 
-# Convert cumulative CPI to daily cumulative CPI
+# Convert cumulative CPI to daily cumulative CPI with normalization
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Reverse the data to get correct cumulative inflation values
+        # Reverse the data to handle increasing cumulative values
         cpi_data = cpi_data[::-1].reset_index(drop=True)
         
-        # Calculate daily inflation values
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(-1)
+        # Normalize cumulative CPI so the last value is 1
+        last_cumulative_cpi = cpi_data['Cumulative_CPI'].iloc[0]
+        cpi_data['Normalized_CPI'] = cpi_data['Cumulative_CPI'] / last_cumulative_cpi
+        
+        # Calculate daily cumulative inflation
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Normalized_CPI'] / cpi_data['Normalized_CPI'].shift(-1)
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
         
         # Make cumulative product to get daily inflation values
