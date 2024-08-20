@@ -40,15 +40,15 @@ def adjust_prices_for_inflation(prices_df, daily_cpi_df):
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
     prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
     
-    # Calculate cumulative product of daily inflation rates
+    # Reverse cumulative product of daily inflation rates for inflation adjustment
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].apply(lambda x: x + 1)  # Convert inflation rates to growth factors
-    prices_df['Cumulative_Inflation'] = (prices_df['Daily_CPI'].cumprod())  # Calculate cumulative inflation
+    prices_df['Cumulative_Inflation'] = (1 + prices_df['Daily_CPI']).cumprod()
     
-    # Find the cumulative inflation factor for the most recent date
-    latest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[-1]
+    # Adjust cumulative inflation to start from 1 (most recent date)
+    prices_df['Cumulative_Inflation'] = prices_df['Cumulative_Inflation'] / prices_df['Cumulative_Inflation'].iloc[-1]
     
     # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Price'] * (latest_cumulative_inflation / prices_df['Cumulative_Inflation'])
+    prices_df['Adjusted_Price'] = prices_df['Price'] / prices_df['Cumulative_Inflation']
     
     return prices_df
 
