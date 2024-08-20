@@ -54,6 +54,10 @@ def convert_monthly_cumulative_to_daily(cpi_data):
 # Adjust historical prices based on daily cumulative inflation
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     try:
+        # Debugging info
+        st.write("Prices DataFrame Columns:", prices_df.columns)
+        st.write("Daily CPI DataFrame Columns:", daily_cpi_df.columns)
+        
         # Check for necessary columns
         if 'Price' not in prices_df.columns:
             st.error("'Price' column is missing from the DataFrame")
