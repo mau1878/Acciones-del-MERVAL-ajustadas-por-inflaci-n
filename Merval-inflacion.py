@@ -18,7 +18,7 @@ def load_cpi_data(cpi_csv_path):
         st.error(f"Error loading CPI data: {e}")
         return pd.DataFrame()
 
-# Convert cumulative CPI to daily cumulative CPI
+# Convert cumulative CPI to daily cumulative CPI with smoothing
 def convert_cumulative_to_daily(cpi_data):
     try:
         # Reverse the data to get correct cumulative inflation values
@@ -28,7 +28,10 @@ def convert_cumulative_to_daily(cpi_data):
         most_recent_value = cpi_data['Cumulative_CPI'].iloc[0]
         cpi_data['Scaled_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / most_recent_value
         
-        # Calculate daily inflation values based on the scaled cumulative CPI
+        # Interpolate daily values across each month
+        cpi_data = cpi_data.set_index('Date').resample('D').interpolate(method='linear').reset_index()
+
+        # Calculate daily inflation values based on the interpolated scaled cumulative CPI
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Scaled_Cumulative_CPI'] / cpi_data['Scaled_Cumulative_CPI'].shift(-1)
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
         
