@@ -16,51 +16,39 @@ def load_cpi_data(cpi_csv_path):
         st.error(f"Error loading CPI data: {e}")
         return pd.DataFrame()
 
-# Convert cumulative CPI to daily CPI
+# Convert cumulative CPI to daily cumulative CPI
 def convert_cumulative_to_daily(cpi_data):
-    daily_cpi = []
-    for i in range(len(cpi_data) - 1):
-        start_date = cpi_data['Date'].iloc[i]
-        end_date = cpi_data['Date'].iloc[i + 1]
-        cumulative_inflation_start = cpi_data['Cumulative_Inflation'].iloc[i]
-        cumulative_inflation_end = cpi_data['Cumulative_Inflation'].iloc[i + 1]
+    try:
+        # Interpolate to get daily data
+        cpi_data = cpi_data.set_index('Date')
+        cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
         
-        # Generate daily dates and apply cumulative inflation
-        date_range = pd.date_range(start_date, end_date - pd.Timedelta(days=1), freq='D')
-        daily_cpi.extend([(date, cumulative_inflation_start) for date in date_range])
-    
-    # Append the last month data
-    last_date = cpi_data['Date'].iloc[-1]
-    last_cumulative_inflation = cpi_data['Cumulative_Inflation'].iloc[-1]
-    daily_cpi.extend([(date, last_cumulative_inflation) for date in pd.date_range(last_date, dt.datetime.today())])
-    
-    daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_Cumulative_Inflation'])
-    return daily_cpi_df
+        # Convert cumulative values to daily cumulative inflation
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI']
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].pct_change().fillna(0) + 1
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
+        
+        daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
+        return daily_cpi_df
+    except Exception as e:
+        st.error(f"Error converting cumulative CPI to daily CPI: {e}")
+        return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
 
-# Adjust historical prices based on daily CPI
+# Adjust historical prices based on daily cumulative CPI
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     try:
         # Merge daily CPI into the stock data
         prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
         prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].fillna(method='ffill')  # Forward fill missing CPI values
         
-        # Ensure proper data type for inflation calculations
-        prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].astype(np.float64)
-        
-        # Calculate cumulative inflation relative to the latest date
-        prices_df = prices_df[::-1].reset_index(drop=True)  # Reverse the DataFrame for backward calculation
-        prices_df['Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'] / prices_df['Daily_Cumulative_Inflation'].iloc[0]
-        prices_df['Cumulative_Inflation'] = prices_df['Cumulative_Inflation'].cumprod().astype(np.float64)
-        prices_df = prices_df[::-1].reset_index(drop=True)  # Re-reverse the DataFrame to original order
-        
         # Check if 'Price' column is available, if not, use 'Ratio' instead
         price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
         
         # Adjust prices based on cumulative inflation
-        prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Cumulative_Inflation']
+        prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Daily_Cumulative_Inflation']
         
         # Set up hover data for Plotly
-        prices_df['Cumulative_Inflation_Hover'] = prices_df['Cumulative_Inflation'].round(4)
+        prices_df['Cumulative_Inflation_Hover'] = prices_df['Daily_Cumulative_Inflation'].round(4)
         prices_df['Unadjusted_Price_Hover'] = prices_df[price_col].round(2)
         prices_df['Adjusted_Price_Hover'] = prices_df['Adjusted_Price'].round(2)
         
@@ -178,7 +166,7 @@ if st.button("Get Data and Plot"):
             '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
             '<extra></extra>'
         )
-        fig.update_traces(customdata=adjusted_ratio_data[['Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
+        fig.update_traces(customdata=adjusted_ratio_data[['Daily_Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
         st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
