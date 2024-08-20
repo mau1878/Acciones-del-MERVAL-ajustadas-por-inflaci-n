@@ -39,11 +39,7 @@ def convert_monthly_to_daily(cpi_data):
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     # Merge daily CPI into the stock data
     prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-    prices_df['Daily_CPI'].fillna(method='ffill', inplace=True)  # Forward fill missing CPI values
-    
-    # Debugging prints
-    print("Prices DataFrame Columns:", prices_df.columns)
-    print("Prices DataFrame Head:\n", prices_df.head())
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'].fillna(method='ffill')  # Forward fill missing CPI values
     
     # Ensure proper data type for inflation calculations
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
@@ -54,9 +50,6 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     
     # Find the cumulative inflation factor for the earliest date
     earliest_cumulative_inflation = prices_df['Cumulative_Inflation'].iloc[0]
-    
-    # Debugging prints
-    print("Earliest Cumulative Inflation:", earliest_cumulative_inflation)
     
     # Adjust prices based on cumulative inflation
     prices_df['Adjusted_Price'] = prices_df['Price'] * (earliest_cumulative_inflation / prices_df['Cumulative_Inflation'])
@@ -72,8 +65,10 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         stock_data.reset_index(inplace=True)
         if 'Adj Close' in stock_data.columns:
             stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
-        else:
+        elif 'Close' in stock_data.columns:
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
+        else:
+            raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
@@ -104,7 +99,7 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
         ratio_df[ticker] = df['Price']
     
     # Forward fill missing values for all stocks
-    ratio_df = ratio_df.fillna(method='ffill')
+    ratio_df = ratio_df.ffill()  # Use ffill instead of deprecated method
     
     # Debugging prints
     print("Ratio DataFrame Columns:", ratio_df.columns)
