@@ -59,9 +59,11 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Fetch individual stock data
     stock_dfs = {}
     for part in parts:
-        ticker = part.strip()
+        ticker = re.findall(r"[A-Z\.]+", part.strip())[0]
+        multiplier = float(re.findall(r"\d+", part.strip())[0]) if re.findall(r"\d+", part.strip()) else 1.0
         if ticker:
             stock_dfs[ticker] = fetch_stock_data(ticker, start_date, end_date)
+            stock_dfs[ticker]['Price'] *= multiplier  # Apply the multiplier
     
     # Create a DataFrame for the ratio
     ratio_df = pd.DataFrame()
