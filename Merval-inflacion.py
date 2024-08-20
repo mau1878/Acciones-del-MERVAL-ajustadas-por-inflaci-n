@@ -11,14 +11,20 @@ def load_cpi_data(cpi_csv_path):
     try:
         cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'])
         cpi_data = cpi_data.sort_values('Date')
+        st.write("CPI Data Columns:", cpi_data.columns.tolist())  # Debugging line
         return cpi_data
     except Exception as e:
         st.error(f"Error loading CPI data: {e}")
         return pd.DataFrame()
 
-# Convert monthly cumulative CPI to daily CPI
+# Convert monthly cumulative CPI to daily inflation factors
 def convert_monthly_to_daily(cpi_data):
     daily_cpi = []
+    # Check if the expected column is present
+    if 'Cumulative_Inflation' not in cpi_data.columns:
+        st.error("Cumulative_Inflation column is missing from CPI data.")
+        return pd.DataFrame()
+    
     for i in range(len(cpi_data) - 1):
         start_date = cpi_data['Date'].iloc[i]
         end_date = cpi_data['Date'].iloc[i + 1]
@@ -33,7 +39,10 @@ def convert_monthly_to_daily(cpi_data):
     last_cumulative_inflation = cpi_data['Cumulative_Inflation'].iloc[-1]
     daily_cpi.extend([(date, last_cumulative_inflation) for date in pd.date_range(last_date, dt.datetime.today())])
     
-    daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Daily_Cumulative_Inflation'])
+    daily_cpi_df = pd.DataFrame(daily_cpi, columns=['Date', 'Cumulative_Inflation'])
+    daily_cpi_df['Daily_Inflation_Factor'] = daily_cpi_df['Cumulative_Inflation'].pct_change().fillna(0) + 1
+    daily_cpi_df['Daily_Inflation_Factor'] = daily_cpi_df['Daily_Inflation_Factor'].cumprod()
+    
     return daily_cpi_df
 
 # Adjust historical prices based on daily CPI
@@ -41,26 +50,14 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     try:
         # Merge daily CPI into the stock data
         prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
-        prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].fillna(method='ffill')  # Forward fill missing CPI values
+        prices_df['Daily_Inflation_Factor'] = prices_df['Daily_Inflation_Factor'].fillna(method='ffill')  # Forward fill missing CPI values
         
-        # Ensure proper data type for inflation calculations
-        prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].astype(np.float64)
-        
-        # Reverse the calculation of cumulative inflation to start from 1 at the latest date
-        prices_df = prices_df[::-1].reset_index(drop=True)  # Reverse the DataFrame for backward calculation
-        prices_df['Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'] / prices_df['Daily_Cumulative_Inflation'].iloc[0]
-        prices_df['Cumulative_Inflation'] = prices_df['Cumulative_Inflation'].cumprod().astype(np.float64)
-        prices_df = prices_df[::-1].reset_index(drop=True)  # Re-reverse the DataFrame to original order
-        
-        # Check if 'Price' column is available, if not, use 'Ratio' instead
-        price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
-        
-        # Adjust prices based on cumulative inflation
-        prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Cumulative_Inflation']
+        # Adjust prices based on daily inflation factors
+        prices_df['Adjusted_Price'] = prices_df['Price'] / prices_df['Daily_Inflation_Factor']
         
         # Set up hover data for Plotly
-        prices_df['Cumulative_Inflation_Hover'] = prices_df['Cumulative_Inflation'].round(4)
-        prices_df['Unadjusted_Price_Hover'] = prices_df[price_col].round(2)
+        prices_df['Cumulative_Inflation_Hover'] = prices_df['Daily_Inflation_Factor'].round(4)
+        prices_df['Unadjusted_Price_Hover'] = prices_df['Price'].round(2)
         prices_df['Adjusted_Price_Hover'] = prices_df['Adjusted_Price'].round(2)
         
         return prices_df
@@ -138,6 +135,10 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
     try:
         # Load CPI data and convert to daily
         cpi_data = load_cpi_data(cpi_csv_path)
+        if cpi_data.empty:
+            st.error("No CPI data available.")
+            return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+        
         daily_cpi_df = convert_monthly_to_daily(cpi_data)
         
         # Parse and fetch ratio data
@@ -165,19 +166,10 @@ if st.button("Get Data and Plot"):
     adjusted_ratio_data = main(ratio_expr, start_date, end_date, cpi_csv_path)
     
     if not adjusted_ratio_data.empty:
-        st.write(adjusted_ratio_data.head())
-        fig = px.line(adjusted_ratio_data, x='Date', y=['Ratio', 'Adjusted_Price'], 
-                      labels={'value': 'Price', 'variable': 'Type'},
-                      title="Adjusted vs Unadjusted Prices")
-        fig.update_traces(
-            hovertemplate=
-            '<b>Date:</b> %{x|%b %d, %Y}<br>' +
-            '<b>Unadjusted Price:</b> %{customdata[1]:.2f}<br>' +
-            '<b>Adjusted Price:</b> %{customdata[2]:.2f}<br>' +
-            '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
-            '<extra></extra>'
-        )
-        fig.update_traces(customdata=adjusted_ratio_data[['Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
+        # Plot the adjusted prices
+        fig = px.line(adjusted_ratio_data, x='Date', y='Adjusted_Price', title='Adjusted Ratio Prices',
+                      labels={'Date': 'Date', 'Adjusted_Price': 'Adjusted Price'},
+                      hover_data=['Date', 'Ratio', 'Adjusted_Price_Hover'])
         st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
