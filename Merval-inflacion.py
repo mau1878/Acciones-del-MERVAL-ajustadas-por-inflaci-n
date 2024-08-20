@@ -21,16 +21,20 @@ def load_cpi_data(cpi_csv_path):
 # Convert cumulative CPI to daily cumulative CPI
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Interpolate to get daily data
-        cpi_data = cpi_data.set_index('Date')
-        cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
+        # Reverse the data to get correct cumulative inflation values
+        cpi_data = cpi_data[::-1].reset_index(drop=True)
         
-        # Convert cumulative values to daily cumulative inflation
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(1)
+        # Calculate daily inflation values
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(-1)
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
+        
+        # Make cumulative product to get daily inflation values
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
         
-        daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
+        # Reverse data back to original order
+        cpi_data = cpi_data[::-1].reset_index(drop=True)
+        
+        daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
