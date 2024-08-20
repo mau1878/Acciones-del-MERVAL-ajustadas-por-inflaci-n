@@ -51,8 +51,11 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)
     prices_df = prices_df[::-1].reset_index(drop=True)  # Re-reverse the DataFrame to original order
     
+    # Check if 'Price' column is available, if not, use 'Ratio' instead
+    price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
+    
     # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Price'] * prices_df['Cumulative_Inflation']
+    prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Cumulative_Inflation']
     
     return prices_df
 
