@@ -54,17 +54,24 @@ def convert_monthly_cumulative_to_daily(cpi_data):
 # Adjust historical prices based on daily cumulative inflation
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
     try:
+        # Check for necessary columns
         if 'Price' not in prices_df.columns:
+            st.error("'Price' column is missing from the DataFrame")
             raise KeyError("'Price' column is missing from the DataFrame")
         if 'Date' not in prices_df.columns:
+            st.error("'Date' column is missing from the DataFrame")
             raise KeyError("'Date' column is missing from the DataFrame")
         
+        # Merge dataframes
         prices_df = prices_df.merge(daily_cpi_df, on='Date', how='left')
         prices_df['Daily_Cumulative_Inflation'] = prices_df['Daily_Cumulative_Inflation'].fillna(method='ffill')
         
+        # Check if 'Daily_Cumulative_Inflation' is present
         if 'Daily_Cumulative_Inflation' not in prices_df.columns:
+            st.error("'Daily_Cumulative_Inflation' column is missing from the DataFrame")
             raise KeyError("'Daily_Cumulative_Inflation' column is missing from the DataFrame")
         
+        # Calculate adjusted price
         prices_df['Adjusted_Price'] = prices_df['Price'] * (prices_df['Daily_Cumulative_Inflation'].iloc[-1] / prices_df['Daily_Cumulative_Inflation'])
         return prices_df
     except KeyError as e:
@@ -79,6 +86,7 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
     try:
         stock_data = yf.download(ticker, start=start_date, end=end_date, interval='1d')
         if stock_data.empty:
+            st.error(f"No data found for ticker {ticker}")
             raise ValueError(f"No data found for ticker {ticker}")
         stock_data.reset_index(inplace=True)
         if 'Adj Close' in stock_data.columns:
@@ -86,6 +94,7 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         elif 'Close' in stock_data.columns:
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         else:
+            st.error(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
             raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
         return stock_data[['Date', 'Price']]
     except Exception as e:
@@ -143,6 +152,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
             adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
             return adjusted_ratio_data
         else:
+            st.error("No data available for the selected ratio and date range.")
             return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
     except Exception as e:
         st.error(f"Error in main function: {e}")
