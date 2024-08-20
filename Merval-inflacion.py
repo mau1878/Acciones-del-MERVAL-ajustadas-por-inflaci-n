@@ -57,6 +57,11 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     # Adjust prices based on cumulative inflation
     prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Cumulative_Inflation']
     
+    # Set up hover data for Plotly
+    prices_df['Cumulative_Inflation_Hover'] = prices_df['Cumulative_Inflation'].round(4)
+    prices_df['Unadjusted_Price_Hover'] = prices_df[price_col].round(2)
+    prices_df['Adjusted_Price_Hover'] = prices_df['Adjusted_Price'].round(2)
+    
     return prices_df
 
 # Fetch historical stock prices
@@ -152,7 +157,15 @@ if st.button("Get Data and Plot"):
         fig = px.line(adjusted_ratio_data, x='Date', y=['Ratio', 'Adjusted_Price'], 
                       labels={'value': 'Price', 'variable': 'Type'},
                       title="Adjusted vs Unadjusted Prices")
-        fig.update_traces(hovertemplate='%{y:.2f}<br>Date: %{x|%b %d, %Y}<br>Cumulative Inflation: %{customdata[0]:.4f}')
+        fig.update_traces(
+            hovertemplate=
+            '<b>Date:</b> %{x|%b %d, %Y}<br>' +
+            '<b>Unadjusted Price:</b> %{customdata[1]:.2f}<br>' +
+            '<b>Adjusted Price:</b> %{customdata[2]:.2f}<br>' +
+            '<b>Cumulative Inflation:</b> %{customdata[0]:.4f}<br>' +
+            '<extra></extra>'
+        )
+        fig.update_traces(customdata=adjusted_ratio_data[['Cumulative_Inflation_Hover', 'Unadjusted_Price_Hover', 'Adjusted_Price_Hover']])
         st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
