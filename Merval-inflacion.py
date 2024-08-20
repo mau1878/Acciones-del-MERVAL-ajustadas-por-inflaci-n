@@ -131,7 +131,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
         adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
         return adjusted_ratio_data
     else:
-        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price', 'Cumulative_Inflation'])
 
 # Streamlit UI
 st.title("Stock Price Adjustment for Inflation")
@@ -151,7 +151,7 @@ if st.button("Get Data and Plot"):
         fig = px.line(adjusted_ratio_data, x='Date', y=['Ratio', 'Adjusted_Price'], 
                       labels={'value': 'Price', 'Date': 'Date'}, 
                       title="Adjusted and Unadjusted Stock Price Ratios Over Time",
-                      hover_data={'Date': '|%B %d, %Y'})
+                      hover_data={'Date': '|%B %d, %Y', 'Cumulative_Inflation': ':.4f'})
         fig.update_layout(hovermode="x unified")
         st.plotly_chart(fig, use_container_width=True)
     else:
