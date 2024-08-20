@@ -22,42 +22,37 @@ def convert_cumulative_to_daily(cpi_data):
         # Set the index to 'Date' and sort it
         cpi_data = cpi_data.set_index('Date').sort_index()
 
-        # Debug: Print raw CPI data
-        print("Raw CPI Data:", cpi_data.head())
-        
         # Interpolate missing values to ensure continuous data
         cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
 
-        # Debug: Print interpolated CPI data
+        # Debug: Print raw interpolated CPI data
         print("Interpolated CPI Data:", cpi_data.head())
+
+        # Ensure the cumulative CPI starts at 1 for the latest date
+        cpi_data['Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].iloc[-1]
         
-        # Calculate daily percentage change in cumulative CPI
+        # Calculate daily inflation rates
         cpi_data['Daily_Inflation'] = cpi_data['Cumulative_CPI'].pct_change().fillna(0)
-        
-        # Debug: Print daily inflation
-        print("Daily Inflation Data:", cpi_data[['Daily_Inflation']].head())
-        
-        # Smoothen out abrupt changes using rolling average (optional)
-        cpi_data['Daily_Inflation'] = cpi_data['Daily_Inflation'].rolling(window=7, min_periods=1).mean()
-        
-        # Debug: Print smoothed daily inflation
-        print("Smoothed Daily Inflation Data:", cpi_data[['Daily_Inflation']].head())
-        
+
+        # Ensure no negative values in daily inflation (optional)
+        cpi_data['Daily_Inflation'] = cpi_data['Daily_Inflation'].clip(lower=0)
+
+        # Debug: Print daily inflation rates
+        print("Daily Inflation Rates:", cpi_data[['Daily_Inflation']].head())
+
         # Convert daily inflation rates to cumulative inflation
         cpi_data['Daily_Cumulative_Inflation'] = (1 + cpi_data['Daily_Inflation']).cumprod()
         
-        # Normalize to start at 1 (for the latest date)
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'] / cpi_data['Daily_Cumulative_Inflation'].iloc[-1]
-        
-        # Debug: Print final daily cumulative inflation
-        print("Final Daily Cumulative Inflation Data:", cpi_data[['Daily_Cumulative_Inflation']].head())
-        
+        # Debug: Print cumulative inflation
+        print("Daily Cumulative Inflation Data:", cpi_data[['Daily_Cumulative_Inflation']].head())
+
         # Reset index to get 'Date' back as a column
         daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
+
 
 
 # Adjust historical prices based on daily cumulative CPI
