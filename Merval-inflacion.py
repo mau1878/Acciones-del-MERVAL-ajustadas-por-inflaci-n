@@ -74,7 +74,7 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         else:
             raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
-        print(f"Columns in fetched data for {ticker}: {stock_data.columns}")
+        print(f"Fetched data for {ticker}:\n", stock_data.head())  # Debugging line
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
