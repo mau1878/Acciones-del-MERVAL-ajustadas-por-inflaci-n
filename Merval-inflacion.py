@@ -47,6 +47,7 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     # Check for 'Price' column
     if 'Price' not in prices_df.columns:
         st.error("The 'Price' column is missing from the DataFrame.")
+        print("Columns in prices_df:", prices_df.columns)  # Debugging line
         return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
     
     # Calculate cumulative product of daily inflation rates
@@ -68,13 +69,22 @@ def fetch_stock_data(ticker: str, start_date: str, end_date: str) -> pd.DataFram
         if stock_data.empty:
             raise ValueError(f"No data found for ticker {ticker}")
         stock_data.reset_index(inplace=True)
+        print(f"Fetched data for {ticker}:\n", stock_data.head())  # Debugging line
+        
+        # Check available columns and rename
         if 'Adj Close' in stock_data.columns:
             stock_data.rename(columns={'Adj Close': 'Price'}, inplace=True)
         elif 'Close' in stock_data.columns:
             stock_data.rename(columns={'Close': 'Price'}, inplace=True)
         else:
             raise ValueError(f"Neither 'Adj Close' nor 'Close' columns found for ticker {ticker}")
-        print(f"Fetched data for {ticker}:\n", stock_data.head())  # Debugging line
+        
+        # Ensure 'Price' column is present
+        if 'Price' not in stock_data.columns:
+            st.error(f"'Price' column is missing in the data for ticker {ticker}")
+            print("Columns in stock_data:", stock_data.columns)  # Debugging line
+            return pd.DataFrame(columns=['Date', 'Price'])
+        
         return stock_data[['Date', 'Price']]
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {e}")
