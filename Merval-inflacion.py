@@ -22,30 +22,36 @@ def load_cpi_data(cpi_csv_path):
 # Convert cumulative CPI to daily cumulative CPI while considering your specific CPI format
 import pandas as pd
 
+import pandas as pd
+
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Reverse the data so that the most recent date is last
+        # Reverse the data to work with the most recent data last
         cpi_data = cpi_data[::-1].reset_index(drop=True)
+
+        # Scale cumulative CPI values so that the most recent value equals 1
+        most_recent_value = cpi_data['Cumulative_CPI'].iloc[0]
+        cpi_data['Scaled_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / most_recent_value
 
         # Interpolate daily values across each month
         cpi_data['Date'] = pd.to_datetime(cpi_data['Date'])
         cpi_data = cpi_data.set_index('Date').resample('D').interpolate(method='linear').reset_index()
 
-        # Calculate daily inflation values as a ratio of the previous day's cumulative CPI
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(1)
+        # Calculate daily inflation rate as the ratio of the previous day's value to the current day's value
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Scaled_Cumulative_CPI'].shift(1) / cpi_data['Scaled_Cumulative_CPI']
         cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
 
-        # Create a cumulative product to get daily inflation values
-        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
-
-        # Reverse the data back to the original order
+        # Reverse the data back to original order
         cpi_data = cpi_data[::-1].reset_index(drop=True)
-        
+
+        # Return only the Date and Daily_Cumulative_Inflation columns
         daily_cpi_df = cpi_data[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
+
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
+
 
 
 
@@ -60,7 +66,7 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
         price_col = 'Price' if 'Price' in prices_df.columns else 'Ratio'
         
         # Adjust prices based on cumulative inflation
-        prices_df['Adjusted_Price'] = prices_df[price_col] * prices_df['Daily_Cumulative_Inflation']
+        prices_df['Adjusted_Price'] = prices_df[price_col] / prices_df['Daily_Cumulative_Inflation']
         
         # Set up hover data for Plotly
         prices_df['Cumulative_Inflation_Hover'] = prices_df['Daily_Cumulative_Inflation'].round(4)
