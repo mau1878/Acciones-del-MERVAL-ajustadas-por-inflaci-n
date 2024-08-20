@@ -9,7 +9,9 @@ import plotly.express as px
 # Load the CPI data
 def load_cpi_data(cpi_csv_path):
     try:
-        cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'], dayfirst=True)
+        # Load data with correct date parsing
+        cpi_data = pd.read_csv(cpi_csv_path, parse_dates=['Date'], dayfirst=False)
+        cpi_data['Date'] = pd.to_datetime(cpi_data['Date'], format='%m/%d/%Y')
         cpi_data = cpi_data.sort_values('Date')
         return cpi_data
     except Exception as e:
@@ -19,49 +21,20 @@ def load_cpi_data(cpi_csv_path):
 # Convert cumulative CPI to daily cumulative CPI
 def convert_cumulative_to_daily(cpi_data):
     try:
-        # Display the first few rows of the raw CPI data for inspection
-        st.write("Raw CPI Data:", cpi_data.head())
-        
-        # Set the index to 'Date' and sort it
-        cpi_data = cpi_data.set_index('Date').sort_index()
-
-        # Interpolate missing values to ensure continuous data
+        # Interpolate to get daily data
+        cpi_data = cpi_data.set_index('Date')
         cpi_data = cpi_data.resample('D').asfreq().interpolate(method='linear')
         
-        # Display the interpolated data
-        st.write("Interpolated CPI Data:", cpi_data.head())
-
-        # Normalize cumulative CPI so that the most recent date starts at 1
-        latest_cpi = cpi_data['Cumulative_CPI'].iloc[-1]
-        cpi_data['Normalized_Cumulative_CPI'] = cpi_data['Cumulative_CPI'] / latest_cpi
+        # Convert cumulative values to daily cumulative inflation
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Cumulative_CPI'] / cpi_data['Cumulative_CPI'].shift(1)
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].fillna(1)
+        cpi_data['Daily_Cumulative_Inflation'] = cpi_data['Daily_Cumulative_Inflation'].cumprod()
         
-        # Display normalized cumulative CPI
-        st.write("Normalized Cumulative CPI:", cpi_data[['Normalized_Cumulative_CPI']].head())
-
-        # Calculate daily inflation rates
-        cpi_data['Daily_Inflation'] = cpi_data['Normalized_Cumulative_CPI'].pct_change().fillna(0)
-        
-        # Ensure no negative values in daily inflation (optional)
-        cpi_data['Daily_Inflation'] = cpi_data['Daily_Inflation'].clip(lower=0)
-        
-        # Display daily inflation rates
-        st.write("Daily Inflation Rates:", cpi_data[['Daily_Inflation']].head())
-
-        # Calculate cumulative inflation from daily rates
-        cpi_data['Daily_Cumulative_Inflation'] = (1 + cpi_data['Daily_Inflation']).cumprod()
-        
-        # Display cumulative inflation
-        st.write("Daily Cumulative Inflation Data:", cpi_data[['Daily_Cumulative_Inflation']].head())
-
-        # Reset index to get 'Date' back as a column
         daily_cpi_df = cpi_data.reset_index()[['Date', 'Daily_Cumulative_Inflation']]
         return daily_cpi_df
     except Exception as e:
         st.error(f"Error converting cumulative CPI to daily CPI: {e}")
         return pd.DataFrame(columns=['Date', 'Daily_Cumulative_Inflation'])
-
-
-
 
 # Adjust historical prices based on daily cumulative CPI
 def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFrame) -> pd.DataFrame:
