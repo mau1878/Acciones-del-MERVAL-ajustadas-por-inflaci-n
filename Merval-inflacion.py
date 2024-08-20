@@ -45,14 +45,14 @@ def adjust_prices_for_inflation(prices_df: pd.DataFrame, daily_cpi_df: pd.DataFr
     # Ensure proper data type for inflation calculations
     prices_df['Daily_CPI'] = prices_df['Daily_CPI'].astype(np.float64)
     
-    # Calculate cumulative product of daily inflation rates
-    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].add(1).cumprod().astype(np.float64)
-    
-    # Normalize cumulative inflation so that it starts from 1 at the latest date
-    prices_df['Cumulative_Inflation'] = prices_df['Cumulative_Inflation'] / prices_df['Cumulative_Inflation'].iloc[-1]
+    # Reverse the calculation of cumulative inflation to start from 1 at the latest date
+    prices_df['Daily_CPI'] = prices_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
+    prices_df = prices_df[::-1].reset_index(drop=True)  # Reverse the DataFrame for backward calculation
+    prices_df['Cumulative_Inflation'] = prices_df['Daily_CPI'].cumprod().astype(np.float64)
+    prices_df = prices_df[::-1].reset_index(drop=True)  # Re-reverse the DataFrame to original order
     
     # Adjust prices based on cumulative inflation
-    prices_df['Adjusted_Price'] = prices_df['Ratio'] / prices_df['Cumulative_Inflation']
+    prices_df['Adjusted_Price'] = prices_df['Price'] * prices_df['Cumulative_Inflation']
     
     return prices_df
 
@@ -84,7 +84,7 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
     # Fetch individual stock data
     stock_dfs = {}
     for part in parts:
-        if part.isnumeric():
+        if any(char.isdigit() for char in part):  # Handle numbers in the ratio expression
             stock_dfs[part] = pd.DataFrame({'Date': pd.date_range(start=start_date, end=end_date), 'Price': float(part)})
         else:
             ticker = part.strip()
@@ -102,7 +102,7 @@ def parse_and_fetch_ratios(ratio_expr: str, start_date: str, end_date: str) -> p
         ratio_df[ticker] = df['Price']
     
     # Forward fill missing values for all stocks
-    ratio_df = ratio_df.ffill()  # Use ffill instead of deprecated method
+    ratio_df = ratio_df.ffill()
     
     # Calculate the ratio
     ratio_df['Ratio'] = ratio_df[parts[0]]
@@ -131,7 +131,7 @@ def main(ratio_expr: str, start_date: str, end_date: str, cpi_csv_path: str) -> 
         adjusted_ratio_data = adjust_prices_for_inflation(ratio_data, daily_cpi_df)
         return adjusted_ratio_data
     else:
-        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price', 'Cumulative_Inflation'])
+        return pd.DataFrame(columns=['Date', 'Ratio', 'Adjusted_Price'])
 
 # Streamlit UI
 st.title("Stock Price Adjustment for Inflation")
@@ -146,13 +146,10 @@ if st.button("Get Data and Plot"):
     
     if not adjusted_ratio_data.empty:
         st.write(adjusted_ratio_data.head())
-        
-        # Interactive plot using Plotly
         fig = px.line(adjusted_ratio_data, x='Date', y=['Ratio', 'Adjusted_Price'], 
-                      labels={'value': 'Price', 'Date': 'Date'}, 
-                      title="Adjusted and Unadjusted Stock Price Ratios Over Time",
-                      hover_data={'Date': '|%B %d, %Y', 'Cumulative_Inflation': ':.4f'})
-        fig.update_layout(hovermode="x unified")
-        st.plotly_chart(fig, use_container_width=True)
+                      labels={'value': 'Price', 'variable': 'Type'},
+                      title="Adjusted vs Unadjusted Prices")
+        fig.update_traces(hovertemplate='%{y:.2f}<br>Date: %{x|%b %d, %Y}<br>Cumulative Inflation: %{customdata[0]:.4f}')
+        st.plotly_chart(fig)
     else:
         st.write("No data available for the selected ratio and date range.")
