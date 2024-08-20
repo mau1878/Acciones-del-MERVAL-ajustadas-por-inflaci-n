@@ -99,13 +99,13 @@ def adjust_prices_for_inflation(ratio_df: pd.DataFrame, daily_cpi_df: pd.DataFra
     
     # Calculate cumulative product of daily inflation rates
     ratio_df['Daily_CPI'] = ratio_df['Daily_CPI'] + 1  # Convert inflation rates to growth factors
-    ratio_df['Cumulative_Inflation'] = ratio_df['Daily_CPI'].cumprod()
     
-    # Find the cumulative inflation factor for the earliest date
-    earliest_cumulative_inflation = ratio_df['Cumulative_Inflation'].iloc[0]
+    # Calculate cumulative inflation for each date relative to the start date
+    ratio_df['Cumulative_Inflation'] = ratio_df['Daily_CPI'].cumprod()
+    ratio_df['Cumulative_Inflation'] /= ratio_df['Cumulative_Inflation'].iloc[0]  # Normalize to the first date
     
     # Adjust prices based on cumulative inflation
-    ratio_df['Adjusted_Price'] = ratio_df['Ratio'] * (earliest_cumulative_inflation / ratio_df['Cumulative_Inflation'])
+    ratio_df['Adjusted_Price'] = ratio_df['Ratio'] * ratio_df['Cumulative_Inflation']
     
     return ratio_df[['Date', 'Ratio', 'Adjusted_Price']]
 
